@@ -15,13 +15,13 @@ export const LandingHero: FC<LandingHeroProps> = ({
         {/* Subtle kicker */}
         <div className="landing-kicker">
           <span className="landing-kicker__dot" />
-          <span>STRUCTURAL MECHANICS ENGINE</span>
+          <span>STRUCTURAL BEAM ANALYSIS</span>
         </div>
 
         {/* Main headline - styled exactly matching the reference's grand typography */}
         <h1 className="landing-headline">
           Understand <br />
-          <span className="landing-headline__accent">every beam.</span>
+          every <span className="landing-headline__accent">beam.</span>
         </h1>
 
         {/* Minimal horizontal divider */}
@@ -29,9 +29,9 @@ export const LandingHero: FC<LandingHeroProps> = ({
 
         {/* Supporting description grounded in real application capabilities */}
         <p className="landing-subtext">
-          Beam Calci couples 100-element Euler-Bernoulli finite element analysis with real-time
-          shear, bending moment, and deflection visualization — bringing rigorous structural mechanics
-          to your browser.
+          Explore the forces within your structure.
+          Calculate reactions, bending moments,
+          and deflection — right in your browser.
         </p>
 
         {/* Action controls */}
@@ -58,7 +58,7 @@ export const LandingHero: FC<LandingHeroProps> = ({
             className="landing-btn-secondary"
             onClick={onExploreFeatures}
           >
-            Explore Features
+            Explore features <span aria-hidden="true">↗</span>
           </button>
         </div>
       </div>

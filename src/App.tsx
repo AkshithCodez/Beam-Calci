@@ -5,6 +5,7 @@ import type { FieldErrors } from './types/beam';
 import { validateInputs } from './engine/validation';
 import { solveBeam } from './engine/beamSolver';
 import Header from './components/Header';
+import Logo from './components/Logo';
 import InputPanel from './components/InputPanel';
 import BeamDiagram from './components/BeamDiagram';
 import ResultsPanel from './components/ResultsPanel';
@@ -31,8 +32,10 @@ const EXAMPLE_FIELDS: InputFields = {
 
 function App() {
   const [theme, setTheme] = useState<Theme>(() => {
-    const stored = localStorage.getItem('beam-calci-theme') as Theme | null;
-    if (stored) return stored;
+    try {
+      const stored = localStorage.getItem('beam-calculator-theme') || localStorage.getItem('beam-calci-theme');
+      if (stored === 'light' || stored === 'dark') return stored;
+    } catch { /* Storage can be unavailable in private or restricted contexts. */ }
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
@@ -70,7 +73,8 @@ function App() {
   // Persist theme
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('beam-calci-theme', theme);
+    document.documentElement.style.colorScheme = theme;
+    try { localStorage.setItem('beam-calculator-theme', theme); } catch { /* Keep session preference. */ }
   }, [theme]);
 
   const handleToggleTheme = useCallback(() => {
@@ -80,13 +84,13 @@ function App() {
   const handleOpenCalculator = useCallback(() => {
     setView('calculator');
     window.location.hash = '#calculator';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
 
   const handleNavigateHome = useCallback(() => {
     setView('landing');
     window.location.hash = '';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
 
   const handleFieldChange = useCallback((key: keyof InputFields, value: string) => {
@@ -149,7 +153,7 @@ function App() {
     setErrors({});
     setView('calculator');
     window.location.hash = '#calculator';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
     handleCalculateWithFields(EXAMPLE_FIELDS);
   }, [handleCalculateWithFields]);
 
@@ -195,7 +199,7 @@ function App() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
-              <span style={{ flex: 1 }}>New to Beam Calci? Try a worked example.</span>
+              <span style={{ flex: 1 }}>New to Beam Calculator? Try a worked example.</span>
               <button
                 onClick={handleLoadExample}
                 style={{
@@ -274,16 +278,19 @@ function App() {
       <footer style={{
         borderTop: '1px solid var(--border)',
         background: 'var(--surface)',
-        padding: '12px 24px',
+        padding: '16px 24px',
         fontSize: '0.75rem',
         color: 'var(--text-3)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: 8,
+        gap: 16,
       }}>
-        <span>Beam Calci v1.0 — Euler-Bernoulli FEA, 100 elements</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <Logo theme={theme} height={24} />
+          <span>Euler-Bernoulli FEA, 100 elements</span>
+        </div>
         <span>Results are for educational and design-check purposes only. Verify against applicable codes before construction.</span>
       </footer>
     </div>

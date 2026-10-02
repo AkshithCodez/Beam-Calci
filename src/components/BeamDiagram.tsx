@@ -100,21 +100,21 @@ const UDLArrows: FC<{ x1: number; x2: number; intensity: number }> = ({ x1, x2, 
   return (
     <g>
       {/* Top horizontal line */}
-      <line x1={x1} y1={topY} x2={x2} y2={topY} stroke="#7C3AED" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1={x1} y1={topY} x2={x2} y2={topY} stroke="var(--chart-defl)" strokeWidth="1.5" strokeLinecap="round" />
       {/* Shaded fill */}
-      <rect x={x1} y={topY} width={x2 - x1} height={botY - topY} fill="#7C3AED" fillOpacity="0.07" />
+      <rect x={x1} y={topY} width={x2 - x1} height={botY - topY} fill="var(--chart-defl)" fillOpacity="0.08" />
       {/* Arrows */}
       {arrows.map((ax, i) => (
         <g key={i}>
-          <line x1={ax} y1={topY} x2={ax} y2={botY} stroke="#7C3AED" strokeWidth="1.5" strokeLinecap="round" />
-          <polygon points={`${ax},${botY} ${ax - 3.5},${botY - 7} ${ax + 3.5},${botY - 7}`} fill="#7C3AED" />
+          <line x1={ax} y1={topY} x2={ax} y2={botY} stroke="var(--chart-defl)" strokeWidth="1.5" strokeLinecap="round" />
+          <polygon points={`${ax},${botY} ${ax - 3.5},${botY - 7} ${ax + 3.5},${botY - 7}`} fill="var(--chart-defl)" />
         </g>
       ))}
       {/* Label */}
       <text
         x={(x1 + x2) / 2} y={topY - 5}
         textAnchor="middle" fontSize="10"
-        fill="#7C3AED" fontFamily="var(--font-mono)" fontWeight="500"
+        fill="var(--chart-defl)" fontFamily="var(--font-mono)" fontWeight="500"
       >
         {intensity >= 1000 ? `${(intensity / 1000).toFixed(1)}kN/m` : `${intensity}N/m`}
       </text>

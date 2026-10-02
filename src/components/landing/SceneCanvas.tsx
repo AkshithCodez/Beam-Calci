@@ -1,612 +1,256 @@
-import { useEffect, useRef, useState, FC } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import * as THREE from 'three';
-import {
-  createCelestialTexture,
-  createCelestialBumpMap,
-  createAtmosphericCloudTexture,
-} from './textureGenerator';
+import { createCloudTexture, createMineralTexture } from './textureGenerator';
+import { createSky, createWater } from './sceneMaterials';
 
-interface SceneCanvasProps {
-  containerRef: React.RefObject<HTMLElement>;
-}
+interface SceneCanvasProps { containerRef: RefObject<HTMLElement>; theme: 'light' | 'dark'; motionEnabled: boolean }
 
-/**
- * Checks if WebGL is supported by the current browser/device.
- */
-function isWebGLAvailable(): boolean {
-  try {
-    const canvas = document.createElement('canvas');
-    return !!(
-      window.WebGLRenderingContext &&
-      (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
-    );
-  } catch {
-    return false;
-  }
-}
-
-export const SceneCanvas: FC<SceneCanvasProps> = ({ containerRef }) => {
+// Composition uses world coordinates, with a stable camera: pointer input only rotates the sphere.
+export default function SceneCanvas({ containerRef, theme, motionEnabled }: SceneCanvasProps) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const [webGLSupported, setWebGLSupported] = useState(true);
-
+  const [failed, setFailed] = useState(false);
+  const motionAllowed = useRef(motionEnabled);
+  const motionChanged = useRef<() => void>();
+  useEffect(() => { motionAllowed.current = motionEnabled; motionChanged.current?.(); }, [motionEnabled]);
   useEffect(() => {
-    if (!isWebGLAvailable()) {
-      setWebGLSupported(false);
-      return;
-    }
-
-    const mount = mountRef.current;
-    const heroContainer = containerRef.current;
-    if (!mount) return;
-
-    // Detect prefers-reduced-motion
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    // ── 1. Scene, Camera, Renderer ─────────────────────────────
+    const mount = mountRef.current, hero = containerRef.current;
+    if (!mount || !hero) return;
+    // A documented static preview also lets low-power devices opt out of WebGL.
+    if (new URLSearchParams(location.search).get('scene') === 'static') { setFailed(true); return; }
+    let renderer: THREE.WebGLRenderer;
+    try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'low-power' }); }
+    catch { setFailed(true); return; }
+    setFailed(false);
+    const dark = theme === 'dark';
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x0c121d, 0.035);
-
-    const width = mount.clientWidth || window.innerWidth;
-    const height = mount.clientHeight || window.innerHeight;
-
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
-    const initialCamPos = new THREE.Vector3(0, 0.6, 9.2);
-    camera.position.copy(initialCamPos);
-
-    let renderer: THREE.WebGLRenderer | null = null;
-    try {
-      renderer = new THREE.WebGLRenderer({
-        antialias: true,
-        alpha: true,
-        powerPreference: 'high-performance',
-      });
-    } catch {
-      setWebGLSupported(false);
-      return;
-    }
-
-    const isMobile = window.innerWidth < 768;
-    renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(width, height);
+    const camera = new THREE.PerspectiveCamera(34, 1, .1, 400);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, mount.clientWidth < 700 ? 1.25 : 1.5));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
+    renderer.toneMappingExposure = dark ? .9 : 1.08;
     mount.appendChild(renderer.domElement);
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(180, 32, 16), createSky(dark));
+    scene.add(sky);
+    scene.add(new THREE.HemisphereLight(dark ? '#7c91ba' : '#c6d7df', '#403a39', dark ? 1.3 : 2));
+    const sun = new THREE.DirectionalLight(dark ? '#ffc178' : '#ffceaa', dark ? 3 : 3.5);
+    sun.position.set(12, 5, -6); scene.add(sun);
+    const fill = new THREE.DirectionalLight('#b2c2d4', dark ? .5 : 1);
+    fill.position.set(-12, 9, 10); scene.add(fill);
+    const portalLight = new THREE.PointLight(dark ? '#ffb65c' : '#ffdab8', dark ? 65 : 110, 18, 2);
+    portalLight.position.set(6.7, 3.3, -1.8); scene.add(portalLight);
+    const mineral = createMineralTexture();
+    mineral.wrapS = mineral.wrapT = THREE.RepeatWrapping;
+    const stone = new THREE.MeshStandardMaterial({
+      color: dark ? '#30394b' : '#69727b', roughness: .89,
+    });
 
-    // ── 2. Atmospheric & Sunset Lighting ────────────────────────
-    // Ambient light - deep moody twilight indigo
-    const ambientLight = new THREE.AmbientLight(0x1a2436, 1.25);
-    scene.add(ambientLight);
+    // A single continuous silhouette, open at its feet. Avoid a hole crossing an outer contour.
+    const profile = new THREE.Shape();
+    profile.moveTo(-2.25, 0); profile.lineTo(-2.25, 10.8); profile.lineTo(2.25, 10.8);
+    profile.lineTo(2.25, 0); profile.lineTo(1.45, 0); profile.lineTo(1.45, 7.45);
+    profile.absarc(0, 7.45, 1.45, 0, Math.PI, false);
+    profile.lineTo(-1.45, 0); profile.closePath();
+    const arch = new THREE.Mesh(new THREE.ExtrudeGeometry(profile, {
+      depth: 1.25, bevelEnabled: true, bevelSize: .025, bevelThickness: .025, bevelSegments: 2, curveSegments: 48,
+    }), stone);
+    arch.position.set(6.2, 0, -3.8); arch.rotation.y = -.66;
+    scene.add(arch);
 
-    // Warm golden sunset key light located behind the monolithic portal
-    const sunsetKeyLight = new THREE.DirectionalLight(0xf79d39, 4.4);
-    sunsetKeyLight.position.set(2.2, 0.8, -3.8);
-    sunsetKeyLight.castShadow = true;
-    sunsetKeyLight.shadow.mapSize.width = 1024;
-    sunsetKeyLight.shadow.mapSize.height = 1024;
-    sunsetKeyLight.shadow.camera.near = 0.5;
-    sunsetKeyLight.shadow.camera.far = 25;
-    sunsetKeyLight.shadow.bias = -0.001;
-    scene.add(sunsetKeyLight);
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(2.25, 64, 40),
+      new THREE.MeshPhysicalMaterial({
+        map: mineral, bumpMap: mineral, bumpScale: .055,
+        color: dark ? '#a2adbd' : '#d7ccc4', roughness: .68, metalness: 0,
+        transparent: true, opacity: .83, depthWrite: false,
+        transmission: .16, thickness: .65, ior: 1.13,
+      }));
+    sphere.position.set(3.75, 6.8, -2); sphere.rotation.y = .35; scene.add(sphere);
+    // Ellipse rises to the right, as in the reference; it stays still during interaction.
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(4.85, .011, 6, 180),
+      new THREE.MeshStandardMaterial({ color: dark ? '#a99069' : '#424b50', roughness: .65, metalness: .3 }));
+    ring.position.set(5.05, 6.5, -2.4); ring.rotation.order = 'ZXY'; ring.rotation.set(1.34, 0, .46); scene.add(ring);
+    const orbMat = new THREE.MeshStandardMaterial({ color: dark ? '#4a5364' : '#78828a', map: mineral, roughness: .8 });
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(.36, 24, 16), orbMat);
+    orb.position.set(-3.7, 3.1, -1); scene.add(orb);
+    const farOrb = new THREE.Mesh(new THREE.SphereGeometry(.17, 20, 12), orbMat);
+    farOrb.position.set(10.2, 3, -5); scene.add(farOrb);
 
-    // Warm rim light defining the outer edge of the monolithic arch portal
-    const archRimLight = new THREE.DirectionalLight(0xe88a38, 2.6);
-    archRimLight.position.set(6.5, 1.8, -1.0);
-    scene.add(archRimLight);
-
-    // Soft cool slate fill light from front-left
-    const fillLight = new THREE.DirectionalLight(0x6a87a8, 1.4);
-    fillLight.position.set(-6, 4, 5);
-    scene.add(fillLight);
-
-    // Warm horizon glow point light for water reflections
-    const horizonGlow = new THREE.PointLight(0xe88a38, 2.8, 22);
-    horizonGlow.position.set(1.8, -2.2, -2.5);
-    scene.add(horizonGlow);
-
-    // Procedural sunset horizon glow backdrop (adds the warm twilight line from reference)
-    const horizonCanvas = document.createElement('canvas');
-    horizonCanvas.width = 512;
-    horizonCanvas.height = 256;
-    const hCtx = horizonCanvas.getContext('2d');
-    if (hCtx) {
-      const hGrad = hCtx.createLinearGradient(0, 0, 0, 256);
-      hGrad.addColorStop(0, 'rgba(11, 16, 26, 0)');
-      hGrad.addColorStop(0.4, 'rgba(19, 28, 45, 0.4)');
-      hGrad.addColorStop(0.78, 'rgba(235, 135, 45, 0.7)');
-      hGrad.addColorStop(0.92, 'rgba(245, 175, 75, 0.9)');
-      hGrad.addColorStop(1, 'rgba(180, 95, 30, 0.6)');
-      hCtx.fillStyle = hGrad;
-      hCtx.fillRect(0, 0, 512, 256);
+    // The pier crosses from lower-left foreground through the portal.
+    const pierMat = new THREE.MeshStandardMaterial({ color: dark ? '#343e50' : '#7b8387', roughness: .86 });
+    const start = new THREE.Vector3(-8, .12, 15), end = new THREE.Vector3(6.1, .12, -5.5);
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(.82, .22, start.distanceTo(end)), pierMat);
+    pier.position.copy(start).add(end).multiplyScalar(.5);
+    pier.rotation.y = Math.atan2(end.x - start.x, end.z - start.z); scene.add(pier);
+    // A distant secondary edge establishes the water level without a floating platform.
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(8.2, .1, .35), pierMat);
+    edge.position.set(-.4, .09, -1.6); scene.add(edge);
+    const figure = new THREE.Group();
+    const figureMat = new THREE.MeshStandardMaterial({ color: '#171e27', roughness: 1 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(.095, .13, .58, 9), figureMat);
+    body.position.y = .64; figure.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.085, 12, 10), figureMat);
+    head.position.y = 1.015; figure.add(head);
+    for (const x of [-.062, .062]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(.034, .028, .4, 7), figureMat);
+      leg.position.set(x, .2, 0); figure.add(leg);
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(.031, .027, .5, 7), figureMat);
+      arm.position.set(x * 2.25, .61, 0); arm.rotation.z = x * 1.1; figure.add(arm);
     }
-    const horizonTex = new THREE.CanvasTexture(horizonCanvas);
-    const horizonPlaneGeo = new THREE.PlaneGeometry(36, 14);
-    const horizonPlaneMat = new THREE.MeshBasicMaterial({
-      map: horizonTex,
-      transparent: true,
-      opacity: 0.8,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const horizonPlane = new THREE.Mesh(horizonPlaneGeo, horizonPlaneMat);
-    horizonPlane.position.set(1.5, -0.6, -7.5);
-    scene.add(horizonPlane);
+    const figureT = .65;
+    figure.position.copy(start).lerp(end, figureT); figure.position.y = .25; scene.add(figure);
 
-    // ── 3. Monolithic Arch Geometry (Procedural) ─────────────────
-    // Recreates the monumental portal structure from the reference
-    const archShape = new THREE.Shape();
-    const aw = 1.75; // half-width = 3.5 total
-    const ah = 7.4;  // total height
-    archShape.moveTo(-aw, 0);
-    archShape.lineTo(aw, 0);
-    archShape.lineTo(aw, ah);
-    archShape.lineTo(-aw, ah);
-    archShape.lineTo(-aw, 0);
-
-    // Inner arch cutout
-    const holePath = new THREE.Path();
-    const hw = 1.05;      // half-width of cutout = 2.1 total
-    const legH = 3.4;     // vertical leg height
-    const archTopH = 4.65; // peak of rounded arch
-    holePath.moveTo(-hw, 0);
-    holePath.lineTo(hw, 0);
-    holePath.lineTo(hw, legH);
-    // Semicircular top arch curve
-    holePath.absarc(0, legH, hw, 0, Math.PI, false);
-    holePath.lineTo(-hw, 0);
-    archShape.holes.push(holePath);
-
-    const extrudeSettings: THREE.ExtrudeGeometryOptions = {
-      depth: 0.95,
-      bevelEnabled: true,
-      bevelSegments: 4,
-      steps: 1,
-      bevelSize: 0.045,
-      bevelThickness: 0.045,
-    };
-
-    const archGeometry = new THREE.ExtrudeGeometry(archShape, extrudeSettings);
-    // Center geometry origin at ground level
-    archGeometry.center();
-    archGeometry.translate(0, ah * 0.5 - 3.2, 0);
-
-    const archMaterial = new THREE.MeshStandardMaterial({
-      color: 0x161d2b,
-      roughness: 0.68,
-      metalness: 0.12,
-    });
-
-    const archMesh = new THREE.Mesh(archGeometry, archMaterial);
-    archMesh.position.set(1.9, 0, -0.9);
-    archMesh.rotation.y = -0.14;
-    archMesh.castShadow = true;
-    archMesh.receiveShadow = true;
-    scene.add(archMesh);
-
-    // ── 4. The Focal Rotating Celestial Sphere ────────────────────
-    // Positioned beside the arch, matching reference composition
-    const sphereRadius = 1.45;
-    const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 64, 64);
-
-    const celestialTex = createCelestialTexture();
-    const celestialBump = createCelestialBumpMap();
-
-    const sphereMaterial = new THREE.MeshStandardMaterial({
-      map: celestialTex,
-      bumpMap: celestialBump,
-      bumpScale: 0.065,
-      roughness: 0.54,
-      metalness: 0.16,
-    });
-
-    const sphereMesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
-    // Anchored beside the arc
-    sphereMesh.position.set(0.38, 1.25, 0.25);
-    sphereMesh.castShadow = true;
-    sphereMesh.receiveShadow = true;
-    scene.add(sphereMesh);
-
-    // ── 5. The Sweeping Orbital Arc (Elliptical Ring) ────────────
-    // Encircles the sphere at an angle, passing through the portal opening
-    const arcRadius = 2.45;
-    const arcTube = 0.024;
-    const arcGeometry = new THREE.TorusGeometry(arcRadius, arcTube, 24, 160);
-
-    const arcMaterial = new THREE.MeshStandardMaterial({
-      color: 0xd89e5a,
-      emissive: 0x6e3c12,
-      emissiveIntensity: 0.45,
-      roughness: 0.22,
-      metalness: 0.88,
-    });
-
-    const arcMesh = new THREE.Mesh(arcGeometry, arcMaterial);
-    // Anchor at sphere position
-    arcMesh.position.copy(sphereMesh.position);
-    // Tilted inclination matching reference angle (~30 deg)
-    const baseArcRotX = Math.PI * 0.46;
-    const baseArcRotY = -Math.PI * 0.16;
-    const baseArcRotZ = -Math.PI * 0.12;
-    arcMesh.rotation.set(baseArcRotX, baseArcRotY, baseArcRotZ);
-    scene.add(arcMesh);
-
-    // ── 6. Secondary Companion Orbs ─────────────────────────────
-    // Mid-ground sphere on the left
-    const orbLeftGeo = new THREE.SphereGeometry(0.28, 32, 32);
-    const orbMat = new THREE.MeshStandardMaterial({
-      color: 0x222a3a,
-      roughness: 0.6,
-      metalness: 0.2,
-    });
-    const orbLeft = new THREE.Mesh(orbLeftGeo, orbMat);
-    orbLeft.position.set(-3.4, -0.65, -1.8);
-    scene.add(orbLeft);
-
-    // Distant small sphere on the right
-    const orbRightGeo = new THREE.SphereGeometry(0.12, 24, 24);
-    const orbRight = new THREE.Mesh(orbRightGeo, orbMat);
-    orbRight.position.set(5.1, -0.2, -4.2);
-    scene.add(orbRight);
-
-    // ── 7. Reflective Water Ground & Architectural Pier ──────────
-    const waterGeo = new THREE.PlaneGeometry(36, 24, 1, 1);
-    const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x090e18,
-      roughness: 0.14,
-      metalness: 0.92,
-    });
-    const waterMesh = new THREE.Mesh(waterGeo, waterMat);
-    waterMesh.rotation.x = -Math.PI / 2;
-    waterMesh.position.y = -3.2;
-    waterMesh.receiveShadow = true;
-    scene.add(waterMesh);
-
-    // Slender pier walkway extending out towards the arch
-    const pierGeo = new THREE.BoxGeometry(0.85, 0.12, 9.5);
-    const pierMat = new THREE.MeshStandardMaterial({
-      color: 0x121722,
-      roughness: 0.7,
-      metalness: 0.1,
-    });
-    const pierMesh = new THREE.Mesh(pierGeo, pierMat);
-    pierMesh.position.set(0.65, -3.14, 0.8);
-    pierMesh.receiveShadow = true;
-    scene.add(pierMesh);
-
-    // Silhouetted figure standing on the pier for scale
-    const figureGroup = new THREE.Group();
-    const figureBodyGeo = new THREE.CylinderGeometry(0.045, 0.075, 0.42, 12);
-    const figureMat = new THREE.MeshBasicMaterial({ color: 0x070b12 });
-    const figureBody = new THREE.Mesh(figureBodyGeo, figureMat);
-    figureBody.position.y = 0.21;
-    const figureHeadGeo = new THREE.SphereGeometry(0.045, 12, 12);
-    const figureHead = new THREE.Mesh(figureHeadGeo, figureMat);
-    figureHead.position.y = 0.46;
-    figureGroup.add(figureBody);
-    figureGroup.add(figureHead);
-    figureGroup.position.set(0.65, -3.08, -1.8);
-    scene.add(figureGroup);
-
-    // ── 8. Volumetric Ambient Cloud Sprites ──────────────────────
-    const cloudTexture = createAtmosphericCloudTexture();
-    const cloudMat = new THREE.SpriteMaterial({
-      map: cloudTexture,
-      transparent: true,
-      opacity: 0.55,
-      blending: THREE.AdditiveBlending,
-    });
-
-    const cloudGroup = new THREE.Group();
-    for (let c = 0; c < 12; c++) {
-      const sprite = new THREE.Sprite(cloudMat);
-      const angle = (c / 12) * Math.PI * 1.5 - 0.4;
-      const dist = 3.5 + (c % 4) * 0.8;
-      sprite.position.set(
-        Math.cos(angle) * dist + 1.2,
-        -2.2 + (c % 3) * 0.45,
-        Math.sin(angle) * dist - 2.5
-      );
-      const scale = 2.4 + (c % 3) * 0.9;
-      sprite.scale.set(scale, scale * 0.65, 1);
-      cloudGroup.add(sprite);
+    // One connected heightfield produces a ridged island silhouette instead of faceted scattered rocks.
+    const rockGeo = new THREE.PlaneGeometry(12, 7, 80, 48);
+    rockGeo.rotateX(-Math.PI / 2);
+    const positions = rockGeo.getAttribute('position');
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i), z = positions.getZ(i);
+      const peak = 2.7 * Math.exp(-((x + 1.5) ** 2 * .7 + z ** 2 * .42));
+      const foothills = .8 * Math.exp(-((x - 1.2) ** 2 * .18 + (z + .5) ** 2 * .55));
+      const ridge = .76 + .16 * Math.sin(x * 8 + z * 3) + .08 * Math.cos(z * 13 - x * 7);
+      positions.setY(i, (peak + foothills) * ridge - .035);
     }
-    scene.add(cloudGroup);
+    rockGeo.computeVertexNormals();
+    const island = new THREE.Mesh(rockGeo, new THREE.MeshStandardMaterial({
+      color: dark ? '#657082' : '#a5a2a0', map: mineral, bumpMap: mineral, bumpScale: .12, roughness: 1,
+    }));
+    island.position.set(12.2, 0, -8); scene.add(island);
 
-    // ── 9. Interaction Dynamics & State ─────────────────────────
-    // Normalized pointer target coordinates
-    const targetRot = { x: 0, y: 0 };
-    const currentRot = { x: 0, y: 0 };
-    let isPointerOver = false;
-    let idleBlend = 1.0; // 1 when idle, 0 when user is actively moving pointer
-    let idleTime = 0;
-    let isVisible = true;
+    const clouds = new THREE.Group();
+    const cloudTextures = [3, 19, 41].map(seed => createCloudTexture(seed, dark));
+    // Photographic alpha texture replaces the procedural fallback once decoded.
+    // Separate world-space planes provide occlusion, depth and water reflections.
+    const cloudPhoto = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}cloud-bank.webp`, () => {
+      if (disposed) { cloudPhoto.dispose(); return; }
+      clouds.children.forEach(child => {
+        const material = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
+        material.map = cloudPhoto; material.color.set(dark ? '#a2aec6' : '#ffffff'); material.needsUpdate = true;
+      });
+      render();
+    }, undefined, () => { /* The local procedural texture remains available offline/on error. */ });
+    cloudPhoto.colorSpace = THREE.SRGBColorSpace;
+    const cloudGeo = new THREE.PlaneGeometry(1, 1);
+    const cloudDefs = [
+      [-17, 1.1, -14, 14, 3.4], [-8, 1.6, -18, 12, 3.8], [0, .9, -18, 10, 2.8],
+      [10, 1, -20, 13, 3], [17, 3, -14, 9, 3.2],
+      [9.5, 8, -7, 10, 2.8], [6, 5.4, -5, 7, 1.8],
+      [5.2, 3.3, -1, 5, 1.5], [-9, .65, -3, 9, 2.2],
+      [-2, 1.35, -7, 6, 2.1], [13, 10, -12, 7, 2.4],
+    ];
+    cloudDefs.forEach(([x, y, z, w, h], i) => {
+      const mat = new THREE.MeshBasicMaterial({ map: cloudTextures[i % 3], transparent: true, depthWrite: false,
+        opacity: i === 7 ? .65 : .86, side: THREE.DoubleSide });
+      const cloud = new THREE.Mesh(cloudGeo, mat); cloud.position.set(x, y, z);
+      cloud.scale.set(w, h, 1); cloud.rotation.z = i === 5 ? .2 : 0; clouds.add(cloud);
+    });
+    scene.add(clouds);
+    const water = createWater(dark, mount.clientWidth < 700); scene.add(water);
 
-    // ±25 degrees = ~0.4363 rad horizontal
-    // ±15 degrees = ~0.2618 rad vertical
-    const MAX_ROT_Y = 25 * (Math.PI / 180);
-    const MAX_ROT_X = 15 * (Math.PI / 180);
-
-    const handlePointerMove = (e: MouseEvent | TouchEvent) => {
-      if (prefersReducedMotion) return;
-
-      const hero = heroContainer || mount;
-      const rect = hero.getBoundingClientRect();
-
-      let clientX = 0;
-      let clientY = 0;
-
-      if ('touches' in e && e.touches.length > 0) {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-      } else if ('clientX' in e) {
-        clientX = (e as MouseEvent).clientX;
-        clientY = (e as MouseEvent).clientY;
-      } else {
-        return;
-      }
-
-      // Check if inside hero area
-      if (
-        clientX >= rect.left &&
-        clientX <= rect.right &&
-        clientY >= rect.top &&
-        clientY <= rect.bottom
-      ) {
-        isPointerOver = true;
-        const normX = ((clientX - rect.left) / rect.width) * 2 - 1;
-        const normY = ((clientY - rect.top) / rect.height) * 2 - 1;
-
-        // Map horizontal pointer to Y-axis rotation
-        // Map vertical pointer to X-axis rotation (inverted so moving up tilts up)
-        targetRot.y = Math.max(-1, Math.min(1, normX)) * MAX_ROT_Y;
-        targetRot.x = -Math.max(-1, Math.min(1, normY)) * MAX_ROT_X;
-      } else if (isPointerOver) {
-        // Just left hero area
-        isPointerOver = false;
-        targetRot.x = 0;
-        targetRot.y = 0;
-      }
-    };
-
-    const handlePointerLeave = () => {
-      isPointerOver = false;
-      targetRot.x = 0;
-      targetRot.y = 0;
-    };
-
-    // Attach pointer listeners to window so movement across hero text is captured
-    window.addEventListener('mousemove', handlePointerMove, { passive: true });
-    window.addEventListener('touchmove', handlePointerMove, { passive: true });
-    document.addEventListener('mouseleave', handlePointerLeave);
-
-    // ── 10. Responsive Resizing ─────────────────────────────────
-    const handleResize = () => {
-      if (!mount || !renderer) return;
-      const w = mount.clientWidth || window.innerWidth;
-      const h = mount.clientHeight || window.innerHeight;
-
+    const resize = () => {
+      const w = mount.clientWidth, h = mount.clientHeight;
       camera.aspect = w / h;
-      // Adjust camera distance & positions on smaller screens
-      if (w < 768) {
-        camera.fov = 48;
-        camera.position.set(0, 0.4, 10.8);
-        sphereMesh.position.set(0, 1.1, 0.2);
-        arcMesh.position.set(0, 1.1, 0.2);
-        archMesh.position.set(1.2, -0.3, -1.2);
-      } else if (w < 1024) {
-        camera.fov = 44;
-        camera.position.set(0, 0.5, 9.8);
-        sphereMesh.position.set(0.3, 1.2, 0.25);
-        arcMesh.position.set(0.3, 1.2, 0.25);
-        archMesh.position.set(1.6, 0, -1.0);
+      if (w < 700) {
+        // Portrait shows the environment below the HTML, retaining a full-size architectural silhouette.
+        camera.fov = 48; camera.position.set(4.1, 1.65, 30); camera.lookAt(4.1, 9.2, -2);
       } else {
-        camera.fov = 40;
-        camera.position.copy(initialCamPos);
-        sphereMesh.position.set(0.38, 1.25, 0.25);
-        arcMesh.position.set(0.38, 1.25, 0.25);
-        archMesh.position.set(1.9, 0, -0.9);
+        camera.fov = 34; camera.position.set(0, 1.65, 24); camera.lookAt(0, 4.55, -2);
+        if (w / h < 1.35) { camera.position.z = 29; camera.position.x = 1.7; camera.lookAt(1.7, 5.2, -2); }
       }
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
+      camera.updateProjectionMatrix(); renderer.setSize(w, h);
+      render();
     };
 
-    window.addEventListener('resize', handleResize);
-    handleResize();
-
-    // ── 11. Intersection Observer & Visibility ──────────────────
-    // Pauses animation loop when scrolled off-screen or tab is hidden
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          isVisible = entry.isIntersecting;
-        });
-      },
-      { threshold: 0.05 }
-    );
-    observer.observe(mount);
-
-    const handleVisibilityChange = () => {
-      isVisible = !document.hidden;
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // ── 12. Main Render Loop ────────────────────────────────────
-    let animationFrameId: number;
-    let lastTime = performance.now();
-
-    const animate = (currentTime: number) => {
-      animationFrameId = requestAnimationFrame(animate);
-
-      if (!isVisible) {
-        lastTime = currentTime;
-        return;
-      }
-
-      const delta = Math.min((currentTime - lastTime) / 1000, 0.1);
-      lastTime = currentTime;
-      idleTime += delta;
-
-      if (!prefersReducedMotion) {
-        // Frame-rate-independent damping (exponential smoothing)
-        const damping = 4.8;
-        const lerpFactor = 1 - Math.exp(-damping * delta);
-
-        currentRot.y += (targetRot.y - currentRot.y) * lerpFactor;
-        currentRot.x += (targetRot.x - currentRot.x) * lerpFactor;
-
-        // Manage idle oscillation: blend out when pointer is actively interacting
-        if (isPointerOver) {
-          idleBlend = Math.max(0, idleBlend - delta * 3.5);
-        } else {
-          idleBlend = Math.min(1, idleBlend + delta * 1.2);
+    let targetX = 0, targetY = 0, currentX = 0, currentY = 0;
+    let frame = 0, last = 0, elapsed = 0, onScreen = true, lost = false, disposed = false;
+    let renderCount = 0;
+    const render = () => {
+      if (!lost && !disposed) {
+        renderer.render(scene, camera);
+        // Development-only observations for interaction / visibility regression checks.
+        if (import.meta.env.DEV) {
+          mount.dataset.sphereRotation = `${sphere.rotation.x.toFixed(4)},${sphere.rotation.y.toFixed(4)}`;
+          mount.dataset.spherePosition = sphere.position.toArray().join(',');
+          mount.dataset.renderCount = String(++renderCount);
         }
-
-        // Very subtle resting idle breathing oscillation
-        const idleRotY = Math.sin(idleTime * 0.35) * 0.035 * idleBlend;
-        const idleRotX = Math.cos(idleTime * 0.28) * 0.018 * idleBlend;
-
-        // Apply primary rotation to the focal celestial sphere
-        sphereMesh.rotation.y = currentRot.y + idleRotY;
-        sphereMesh.rotation.x = currentRot.x + idleRotX;
-
-        // Secondary subtle parallax on the orbital arc (~22% ratio)
-        arcMesh.rotation.y = baseArcRotY + currentRot.y * 0.22;
-        arcMesh.rotation.x = baseArcRotX + currentRot.x * 0.18;
-
-        // Subtle secondary parallax on arch structure
-        archMesh.rotation.y = -0.14 + currentRot.y * 0.06;
-
-        // Subtle camera parallax drift
-        const targetCamX = (isMobile ? 0 : initialCamPos.x) + currentRot.y * 0.35;
-        const targetCamY = initialCamPos.y - currentRot.x * 0.25;
-        camera.position.x += (targetCamX - camera.position.x) * (lerpFactor * 0.5);
-        camera.position.y += (targetCamY - camera.position.y) * (lerpFactor * 0.5);
-        camera.lookAt(0.3, 0.4, 0);
-
-        // Slow ambient drift on cloud sprites
-        cloudGroup.rotation.y = idleTime * 0.012;
       }
-
-      renderer.render(scene, camera);
     };
-
-    animationFrameId = requestAnimationFrame(animate);
-
-    // ── 13. Resource Cleanup ────────────────────────────────────
+    const animate = (now: number) => {
+      frame = 0;
+      if (document.hidden || !onScreen || lost || disposed) return;
+      const dt = Math.min((now - last) / 1000, .05); last = now;
+      if (!motion.matches && motionAllowed.current) {
+        elapsed += dt;
+        const blend = 1 - Math.exp(-5 * dt);
+        currentX += (targetX - currentX) * blend; currentY += (targetY - currentY) * blend;
+        sphere.rotation.set(currentX, .35 + currentY, 0);
+        (water.material as THREE.ShaderMaterial).uniforms.time.value = elapsed;
+      }
+      render();
+      if (!motion.matches && motionAllowed.current) frame = requestAnimationFrame(animate);
+    };
+    const resume = () => {
+      cancelAnimationFrame(frame); frame = 0; last = performance.now();
+      if (!document.hidden && onScreen && !lost) frame = requestAnimationFrame(animate);
+    };
+    const reset = () => { targetX = 0; targetY = 0; };
+    const pointer = (e: PointerEvent) => {
+      if (motion.matches || !motionAllowed.current || (e.pointerType === 'touch' && e.buttons === 0)) return;
+      const rect = hero.getBoundingClientRect();
+      targetY = THREE.MathUtils.clamp((e.clientX - rect.left) / rect.width * 2 - 1, -1, 1) * .34;
+      targetX = THREE.MathUtils.clamp((e.clientY - rect.top) / rect.height * 2 - 1, -1, 1) * .13;
+    };
+    const endTouch = (e: PointerEvent) => { if (e.pointerType !== 'mouse') reset(); };
+    const changeMotion = () => { reset(); currentX = currentY = 0; sphere.rotation.set(0, .35, 0); resume(); };
+    motionChanged.current = changeMotion;
+    const contextLost = (e: Event) => { e.preventDefault(); lost = true; cancelAnimationFrame(frame); setFailed(true); };
+    const contextRestored = () => { lost = false; setFailed(false); resume(); };
+    hero.addEventListener('pointermove', pointer, { passive: true });
+    hero.addEventListener('pointerleave', reset);
+    hero.addEventListener('pointerup', endTouch);
+    hero.addEventListener('pointercancel', reset);
+    motion.addEventListener('change', changeMotion);
+    document.addEventListener('visibilitychange', resume);
+    renderer.domElement.addEventListener('webglcontextlost', contextLost);
+    renderer.domElement.addEventListener('webglcontextrestored', contextRestored);
+    const observer = new IntersectionObserver(([entry]) => { onScreen = entry.isIntersecting; resume(); });
+    observer.observe(hero);
+    const sizeObserver = new ResizeObserver(resize); sizeObserver.observe(mount);
+    resize(); resume();
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('touchmove', handlePointerMove);
-      document.removeEventListener('mouseleave', handlePointerLeave);
-      window.removeEventListener('resize', handleResize);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      observer.disconnect();
-
-      // Dispose Three.js resources
-      archGeometry.dispose();
-      archMaterial.dispose();
-      sphereGeometry.dispose();
-      sphereMaterial.dispose();
-      celestialTex.dispose();
-      celestialBump.dispose();
-      arcGeometry.dispose();
-      arcMaterial.dispose();
-      orbLeftGeo.dispose();
-      orbRightGeo.dispose();
-      orbMat.dispose();
-      waterGeo.dispose();
-      waterMat.dispose();
-      pierGeo.dispose();
-      pierMat.dispose();
-      figureBodyGeo.dispose();
-      figureHeadGeo.dispose();
-      figureMat.dispose();
-      cloudTexture.dispose();
-      cloudMat.dispose();
-      horizonPlaneGeo.dispose();
-      horizonPlaneMat.dispose();
-      horizonTex.dispose();
-
-      if (renderer) {
-        renderer.dispose();
-        if (renderer.domElement && mount.contains(renderer.domElement)) {
-          mount.removeChild(renderer.domElement);
-        }
-      }
+      disposed = true; cancelAnimationFrame(frame);
+      motionChanged.current = undefined;
+      observer.disconnect(); sizeObserver.disconnect();
+      hero.removeEventListener('pointermove', pointer); hero.removeEventListener('pointerleave', reset);
+      hero.removeEventListener('pointerup', endTouch); hero.removeEventListener('pointercancel', reset);
+      motion.removeEventListener('change', changeMotion); document.removeEventListener('visibilitychange', resume);
+      renderer.domElement.removeEventListener('webglcontextlost', contextLost);
+      renderer.domElement.removeEventListener('webglcontextrestored', contextRestored);
+      const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
+      scene.traverse(obj => { if (obj instanceof THREE.Mesh) {
+        geometries.add(obj.geometry);
+        (Array.isArray(obj.material) ? obj.material : [obj.material]).forEach(m => materials.add(m));
+      } });
+      geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose());
+      mineral.dispose(); cloudPhoto.dispose(); cloudTextures.forEach(t => t.dispose()); water.getRenderTarget().dispose();
+      renderer.dispose(); renderer.domElement.remove();
     };
-  }, [containerRef]);
+  }, [containerRef, theme]);
+  return <>
+    <div ref={mountRef} className="scene-canvas-mount" aria-hidden="true" style={{ visibility: failed ? 'hidden' : 'visible' }} />
+    {failed && <div className="scene-fallback" aria-hidden="true">
+      <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="fallback-sky" x2=".9" y2="1"><stop stopColor="#253441"/><stop offset="1" stopColor={theme === 'dark' ? '#665344' : '#eac0a7'}/></linearGradient>
+          <radialGradient id="fallback-orb" cx=".8" cy=".6"><stop stopColor="#e6bf9c" stopOpacity=".3"/><stop offset="1" stopColor="#9fa7af" stopOpacity=".8"/></radialGradient>
+        </defs>
+        <path fill="url(#fallback-sky)" d="M0 0h1440v900H0z"/>
+        <path fill={theme === 'dark' ? '#152235' : '#3c4c57'} d="M870 715V192l212-55v563h-55V355a65 65 0 0 0-130 0v353z"/>
+        <path fill="#8e8985" d="m1082 137 58 38v520l-58 5z"/>
+        <circle cx="896" cy="364" r="144" fill="url(#fallback-orb)"/>
+        <ellipse cx="976" cy="358" rx="300" ry="47" transform="rotate(-28 976 358)" stroke="#bfa78d" fill="none"/>
+        <path fill="#243441" opacity=".75" d="M0 710h1440v190H0z"/>
+        <path fill="#4c565c" d="m50 900 920-195h80L240 900z"/>
+      </svg>
+    </div>}
+  </>;
+}
 
-  if (!webGLSupported) {
-    return (
-      <div className="scene-fallback" aria-label="Beam Calci 3D visualization preview">
-        <svg
-          className="scene-fallback__svg"
-          viewBox="0 0 1000 800"
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0B101A" />
-              <stop offset="55%" stopColor="#1B263B" />
-              <stop offset="85%" stopColor="#B36A2E" />
-              <stop offset="100%" stopColor="#0D1420" />
-            </linearGradient>
-            <radialGradient id="sunGlow" cx="65%" cy="60%" r="40%">
-              <stop offset="0%" stopColor="#F5A647" stopOpacity="0.85" />
-              <stop offset="45%" stopColor="#D97A26" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#0B101A" stopOpacity="0" />
-            </radialGradient>
-            <linearGradient id="sphereGrad" x1="0.2" y1="0.2" x2="0.85" y2="0.85">
-              <stop offset="0%" stopColor="#3A485C" />
-              <stop offset="60%" stopColor="#1E2738" />
-              <stop offset="90%" stopColor="#F39C38" />
-            </linearGradient>
-          </defs>
-
-          {/* Sky background */}
-          <rect width="1000" height="800" fill="url(#skyGrad)" />
-          <circle cx="650" cy="480" r="320" fill="url(#sunGlow)" />
-
-          {/* Monolithic Arch */}
-          <path
-            d="M 520,200 L 760,200 L 760,650 L 690,650 L 690,380 Q 640,320 590,380 L 590,650 L 520,650 Z"
-            fill="#151C2A"
-          />
-
-          {/* Celestial Sphere */}
-          <circle cx="480" cy="380" r="140" fill="url(#sphereGrad)" />
-
-          {/* Orbital Ring Arc */}
-          <ellipse
-            cx="480"
-            cy="380"
-            rx="230"
-            ry="45"
-            transform="rotate(-28 480 380)"
-            fill="none"
-            stroke="#D89E5A"
-            strokeWidth="3.5"
-          />
-
-          {/* Reflective Water surface */}
-          <rect x="0" y="650" width="1000" height="150" fill="#0A0E18" />
-          <line x1="0" y1="650" x2="1000" y2="650" stroke="#E28E3A" strokeWidth="2" strokeOpacity="0.5" />
-        </svg>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={mountRef}
-      className="scene-canvas-mount"
-      role="img"
-      aria-label="Interactive 3D visualization featuring an architectural portal arch, an orbital ring, and a rotating celestial sphere responding to pointer movements"
-    />
-  );
-};
-
-export default SceneCanvas;

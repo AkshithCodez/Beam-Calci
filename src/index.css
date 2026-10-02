@@ -7,39 +7,42 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Work+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ── Design Tokens ──────────────────────────────────────────── */
+/* ── Design Tokens ──────────────────────────────────────────── */
 :root {
-  /* Light theme */
-  --bg:           #F5F4F0;
+  /* Light theme: warm sunlight, peach, cream, stone & slate */
+  --bg:           #F8F6F0;
   --surface:      #FFFFFF;
-  --surface-2:    #F9F8F5;
-  --border:       #E2DDD5;
-  --border-2:     #C8C2B8;
-  --text-1:       #0F1E3C;
-  --text-2:       #4E5A70;
-  --text-3:       #8892A4;
+  --surface-2:    #F2EDE4;
+  --border:       #E5DFD5;
+  --border-2:     #CFC7B9;
+  --text-1:       #1E293B;   /* Deep slate */
+  --text-2:       #475569;   /* Muted slate */
+  --text-3:       #828F9F;
+  --surface-hover:#FAF8F5;
 
-  --accent:       #1E3A5F;   /* Deep navy — primary */
-  --accent-2:     #0D8C7A;   /* Teal — interactive */
-  --accent-light: #E4EDF7;
-  --accent-2-light: #E0F4F1;
+  --accent:       #C27838;   /* Restrained copper / peach-gold */
+  --btn-primary-text: #FFFFFF;
+  --accent-2:     #0D8C7A;   /* Interactive teal */
+  --accent-light: #FBEFE4;
+  --accent-2-light:#E0F4F1;
 
-  --danger:       #B91C1C;
+  --danger:       #DC2626;
   --danger-light: #FEE2E2;
-  --warning:      #A16207;
+  --warning:      #D97706;
   --warning-light:#FEF3C7;
-  --success:      #065F46;
+  --success:      #059669;
   --success-light:#D1FAE5;
 
   /* SFD/BMD chart colours */
   --chart-shear:  #2563EB;
-  --chart-moment: #059669;
+  --chart-moment: #C27838;
   --chart-defl:   #7C3AED;
-  --chart-zero:   #D1D5DB;
+  --chart-zero:   #94A3B8;
 
   /* Shadows */
-  --shadow-sm:    0 1px 2px 0 rgba(15,30,60,.06);
-  --shadow-md:    0 2px 8px -1px rgba(15,30,60,.10), 0 1px 2px -1px rgba(15,30,60,.06);
-  --shadow-lg:    0 8px 24px -4px rgba(15,30,60,.12), 0 2px 6px -2px rgba(15,30,60,.08);
+  --shadow-sm:    0 1px 3px 0 rgba(30,41,59,.06);
+  --shadow-md:    0 4px 12px -2px rgba(30,41,59,.08), 0 2px 4px -2px rgba(30,41,59,.05);
+  --shadow-lg:    0 12px 28px -6px rgba(30,41,59,.12), 0 4px 8px -2px rgba(30,41,59,.06);
 
   /* Spacing */
   --r-sm:  6px;
@@ -58,37 +61,39 @@
   --t-slow:   300ms ease;
 }
 
-/* Dark theme */
+/* Dark theme: midnight navy, near-black, amber-gold & ivory */
 [data-theme="dark"] {
-  --bg:           #0D1B2A;
-  --surface:      #162032;
-  --surface-2:    #1A2840;
-  --border:       #253550;
-  --border-2:     #314A6E;
-  --text-1:       #EEF2F7;
-  --text-2:       #94A3B8;
-  --text-3:       #607090;
+  --bg:           #0B0F19;   /* Near-black */
+  --surface:      #111726;   /* Midnight navy */
+  --surface-2:    #162034;
+  --border:       #1F2C44;
+  --border-2:     #2E3E5C;
+  --text-1:       #F8FAFC;   /* Ivory */
+  --text-2:       #94A3B8;   /* Muted blue-gray */
+  --text-3:       #64748B;
+  --surface-hover:#172238;
 
-  --accent:       #3B6BBF;
-  --accent-2:     #14B8A6;
-  --accent-light: #1A2D48;
+  --accent:       #DFA85B;   /* Amber gold */
+  --btn-primary-text: #0B0F19;
+  --accent-2:     #14B8A6;   /* Interactive teal */
+  --accent-light: #2A2215;
   --accent-2-light:#0D2E2A;
 
-  --danger:       #F87171;
-  --danger-light: #3B1515;
-  --warning:      #FCD34D;
-  --warning-light:#3B2900;
-  --success:      #34D399;
-  --success-light:#053D27;
+  --danger:       #EF4444;
+  --danger-light: #381616;
+  --warning:      #F59E0B;
+  --warning-light:#382705;
+  --success:      #10B981;
+  --success-light:#063524;
 
   --chart-shear:  #60A5FA;
-  --chart-moment: #34D399;
+  --chart-moment: #F59E0B;
   --chart-defl:   #A78BFA;
-  --chart-zero:   #374151;
+  --chart-zero:   #475569;
 
-  --shadow-sm:    0 1px 2px 0 rgba(0,0,0,.3);
-  --shadow-md:    0 2px 8px -1px rgba(0,0,0,.4), 0 1px 2px -1px rgba(0,0,0,.3);
-  --shadow-lg:    0 8px 24px -4px rgba(0,0,0,.5), 0 2px 6px -2px rgba(0,0,0,.3);
+  --shadow-sm:    0 1px 3px 0 rgba(0,0,0,.4);
+  --shadow-md:    0 4px 12px -2px rgba(0,0,0,.5), 0 2px 4px -2px rgba(0,0,0,.3);
+  --shadow-lg:    0 12px 28px -6px rgba(0,0,0,.6), 0 4px 8px -2px rgba(0,0,0,.4);
 }
 
 /* ── Reset & Base ───────────────────────────────────────────── */
@@ -437,10 +442,14 @@ body {
 .btn--primary {
   flex: 1;
   background: var(--accent);
-  color: #fff;
+  color: var(--btn-primary-text);
   box-shadow: var(--shadow-sm);
+  font-weight: 600;
 }
-.btn--primary:hover { background: #162E4E; box-shadow: var(--shadow-md); }
+.btn--primary:hover {
+  filter: brightness(1.08);
+  box-shadow: var(--shadow-md);
+}
 
 .btn--secondary {
   background: var(--surface-2);
@@ -448,6 +457,17 @@ body {
   border: 1px solid var(--border);
 }
 .btn--secondary:hover { background: var(--border); color: var(--text-1); }
+
+.btn--outline {
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+}
+.btn--outline:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+  border-color: var(--border-2);
+}
 
 /* ── Results side ───────────────────────────────────────────── */
 .results-col { display: flex; flex-direction: column; gap: 20px; }
@@ -741,3 +761,13 @@ body {
 
 /* ── Focus ring ─────────────────────────────────────────────── */
 :focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+/* Reference composition: a cinematic dusk hero within the light product theme. */
+.brand-logo { display:inline-flex; align-items:center; gap:10px; height:var(--logo-height); white-space:nowrap; color:var(--text-1); }
+.brand-logo__mark { position:relative; display:inline-block; width:calc(var(--logo-height) * 1.17); height:var(--logo-height); overflow:hidden; flex-shrink:0; }
+.brand-logo__mark img { position:absolute; max-width:none; height:calc(var(--logo-height) * 1.684); width:calc(var(--logo-height) * 5.05); left:calc(var(--logo-height) * -.256); top:calc(var(--logo-height) * -.326); }
+.brand-logo__name { font-family:var(--font-head); font-size:15px; font-weight:400; letter-spacing:.22em; }
+:root { --text-3:#647184; --accent:#a6632c; }
+[data-theme="dark"] { --text-3:#98a6bd; }
+@media(max-width:480px) { .header__inner { padding:0 12px; gap:8px; } .header__nav { gap:6px; } .header .brand-logo__name { font-size:12px; letter-spacing:.1em; } }
+

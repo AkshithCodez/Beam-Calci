@@ -1,33 +1,11 @@
 import type { FC } from 'react';
+import Logo from './Logo';
 
 interface HeaderProps {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   onNavigateHome?: () => void;
 }
-
-const BeamLogo: FC = () => (
-  <svg
-    className="header__logo-icon"
-    viewBox="0 0 36 36"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-hidden="true"
-  >
-    {/* Beam body */}
-    <rect x="2" y="14" width="32" height="8" rx="2" fill="var(--accent)" />
-    {/* Left pin support (triangle) */}
-    <polygon points="9,22 4,30 14,30" fill="var(--accent-2)" />
-    <line x1="2" y1="31" x2="16" y2="31" stroke="var(--accent-2)" strokeWidth="2" strokeLinecap="round"/>
-    {/* Right roller support */}
-    <polygon points="27,22 22,30 32,30" fill="var(--accent-2)" />
-    <circle cx="24.5" cy="32" r="2" fill="var(--accent-2)" />
-    <circle cx="29.5" cy="32" r="2" fill="var(--accent-2)" />
-    {/* Point load arrow (downward) */}
-    <line x1="18" y1="4" x2="18" y2="13" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round"/>
-    <polygon points="18,14 14.5,7 21.5,7" fill="#DC2626"/>
-  </svg>
-);
 
 const SunIcon: FC = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -57,7 +35,7 @@ const Header: FC<HeaderProps> = ({ theme, onToggleTheme, onNavigateHome }) => {
         <a
           href="#home"
           className="header__logo"
-          aria-label="Beam Calci — home"
+          aria-label="Beam Calculator — home"
           onClick={(e) => {
             if (onNavigateHome) {
               e.preventDefault();
@@ -65,13 +43,7 @@ const Header: FC<HeaderProps> = ({ theme, onToggleTheme, onNavigateHome }) => {
             }
           }}
         >
-          <BeamLogo />
-          <div>
-            <span className="header__brand">
-              Beam <span>Calci</span>
-            </span>
-            <span className="header__tagline">Structural Beam Analysis</span>
-          </div>
+          <Logo theme={theme} height={34} />
         </a>
 
         <div className="header__spacer" />
@@ -82,8 +54,8 @@ const Header: FC<HeaderProps> = ({ theme, onToggleTheme, onNavigateHome }) => {
               type="button"
               className="btn btn--outline"
               style={{
-                padding: '5px 12px',
-                fontSize: '0.78rem',
+                padding: '5px 14px',
+                fontSize: '0.8rem',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
@@ -91,7 +63,7 @@ const Header: FC<HeaderProps> = ({ theme, onToggleTheme, onNavigateHome }) => {
                 fontFamily: 'var(--font-head)',
               }}
               onClick={onNavigateHome}
-              title="Return to 3D Landing Page"
+              title="Return to 3D Overview"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <line x1="19" y1="12" x2="5" y2="12" />
@@ -103,11 +75,11 @@ const Header: FC<HeaderProps> = ({ theme, onToggleTheme, onNavigateHome }) => {
 
           <button
             className="btn-icon"
-            aria-label="About Beam Calci"
+            aria-label="About Beam Calculator"
             title="About"
             onClick={() => {
               alert(
-                'Beam Calci v1.0\n\nA professional structural beam analysis tool.\n\n' +
+                'Beam Calculator v1.0\n\nA professional structural beam analysis platform.\n\n' +
                 'Supports:\n• Simply supported beams\n• Cantilever beams\n• Fixed-fixed beams\n• Propped cantilevers\n\n' +
                 'Method: Euler-Bernoulli Finite Element Analysis\n' +
                 'Elements: 100 Hermitian beam elements\n\n' +

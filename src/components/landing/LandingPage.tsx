@@ -1,6 +1,7 @@
-import { useRef, useState, FC } from 'react';
-import SceneCanvas from './SceneCanvas';
+import { useRef, useState, lazy, Suspense, FC } from 'react';
+const SceneCanvas = lazy(() => import('./SceneCanvas'));
 import LandingHero from './LandingHero';
+import Logo from '../Logo';
 import './landing.css';
 
 interface LandingPageProps {
@@ -10,33 +11,6 @@ interface LandingPageProps {
   onToggleTheme: () => void;
 }
 
-const BeamCalciLogo: FC = () => (
-  <svg
-    className="landing-nav__logo-icon"
-    viewBox="0 0 32 32"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-hidden="true"
-  >
-    {/* Architectural arch with beam flexure curve */}
-    <path
-      d="M6 24V14C6 8.47715 10.4772 4 16 4C21.5228 4 26 8.47715 26 14V24"
-      stroke="url(#logoGrad)"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-    />
-    <line x1="4" y1="24" x2="28" y2="24" stroke="#dfa85b" strokeWidth="2.5" strokeLinecap="round" />
-    <circle cx="16" cy="14" r="3.5" fill="#dfa85b" />
-    <defs>
-      <linearGradient id="logoGrad" x1="6" y1="4" x2="26" y2="24" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#ffffff" />
-        <stop offset="0.6" stopColor="#dfa85b" />
-        <stop offset="1" stopColor="#94a3b8" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
-
 export const LandingPage: FC<LandingPageProps> = ({
   onOpenCalculator,
   onLoadExampleAndCalculate,
@@ -44,18 +18,19 @@ export const LandingPage: FC<LandingPageProps> = ({
   onToggleTheme,
 }) => {
   const heroRef = useRef<HTMLElement>(null);
+  const [motionEnabled, setMotionEnabled] = useState(true);
   const [activeSection, setActiveSection] = useState<'overview' | 'features' | 'workflow' | 'theory'>('overview');
 
   const scrollToSection = (id: string, sectionKey: typeof activeSection) => {
     setActiveSection(sectionKey);
     const el = document.getElementById(id);
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
+      el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
     }
   };
 
   return (
-    <div className="landing-page">
+    <div className="landing-page" data-theme={theme}>
       {/* ── Top Navigation Bar ───────────────────────────────── */}
       <header className="landing-nav" role="banner">
         <div className="landing-nav__inner">
@@ -66,12 +41,9 @@ export const LandingPage: FC<LandingPageProps> = ({
               e.preventDefault();
               scrollToSection('hero', 'overview');
             }}
-            aria-label="Beam Calci — Home"
+            aria-label="Beam Calculator — Home"
           >
-            <BeamCalciLogo />
-            <span className="landing-nav__brand-title">
-              BEAM <span>CALCI</span>
-            </span>
+            <Logo theme={theme} height={32} />
           </a>
 
           <nav className="landing-nav__links" aria-label="Landing Navigation">
@@ -144,27 +116,34 @@ export const LandingPage: FC<LandingPageProps> = ({
               className="landing-nav__cta"
               onClick={onOpenCalculator}
             >
-              LAUNCH APP
+              OPEN CALCULATOR
             </button>
           </div>
         </div>
       </header>
 
+      <main id="main-content">
       {/* ── 3D Hero Section ──────────────────────────────────── */}
       <section
         id="hero"
         ref={heroRef}
         className="landing-hero"
-        aria-label="Beam Calci 3D Hero"
+        aria-label="Beam Calculator 3D Hero"
       >
         {/* Three.js Interactive WebGL Scene */}
-        <SceneCanvas containerRef={heroRef} />
+        <Suspense fallback={null}>
+          <SceneCanvas containerRef={heroRef} theme={theme} motionEnabled={motionEnabled} />
+        </Suspense>
 
         {/* HTML Content Overlay */}
         <LandingHero
           onOpenCalculator={onOpenCalculator}
           onExploreFeatures={() => scrollToSection('features', 'features')}
         />
+        <button type="button" className="scene-motion-control" aria-pressed={!motionEnabled}
+          onClick={() => setMotionEnabled(value => !value)}>
+          {motionEnabled ? 'Pause scene motion' : 'Resume scene motion'}
+        </button>
       </section>
 
       {/* ── Features Section ─────────────────────────────────── */}
@@ -177,7 +156,7 @@ export const LandingPage: FC<LandingPageProps> = ({
             </h2>
             <p className="landing-section-desc">
               From continuous elasticity theory to discretized matrix equations,
-              Beam Calci delivers structural mechanics directly in your browser.
+              Beam Calculator delivers structural mechanics directly in your browser.
             </p>
           </div>
 
@@ -195,7 +174,7 @@ export const LandingPage: FC<LandingPageProps> = ({
                 Discretizes the beam span into 100 elements using 2-node cubic Hermitian shape
                 functions (C¹ continuity). Solves the global stiffness matrix via Gaussian elimination.
               </p>
-              <div className="feature-card__badge">High Precision</div>
+              <div className="feature-card__badge">100 elements</div>
             </div>
 
             <div className="feature-card">
@@ -255,10 +234,10 @@ export const LandingPage: FC<LandingPageProps> = ({
                   <line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
               </div>
-              <h3 className="feature-card__title">Transparent Step-by-Step Proofs</h3>
+              <h3 className="feature-card__title">Equilibrium &amp; Reaction Checks</h3>
               <p className="feature-card__desc">
-                Review complete mathematical derivations: static equilibrium equations ΣFy = 0,
-                moment balance ΣM = 0, reaction breakdown, and maximum moment location.
+                Review static equilibrium checks, force and moment balance, support reactions,
+                and the location of the maximum bending moment.
               </p>
               <div className="feature-card__badge">Pedagogical Clarity</div>
             </div>
@@ -345,7 +324,7 @@ export const LandingPage: FC<LandingPageProps> = ({
             <span className="landing-section-tag">THEORETICAL FOUNDATION</span>
             <h2 className="landing-section-title">Classical Beam Theory Meets Modern FEA</h2>
             <p className="landing-section-desc">
-              Beam Calci implements the standard Euler-Bernoulli fourth-order governing differential equation.
+              Beam Calculator implements the standard Euler-Bernoulli fourth-order governing differential equation.
             </p>
           </div>
 
@@ -414,8 +393,8 @@ export const LandingPage: FC<LandingPageProps> = ({
             <div className="landing-cta-arch-deco" aria-hidden="true" />
             <h2 className="landing-cta-title">Ready to analyze your structure?</h2>
             <p className="landing-cta-desc">
-              Experience instant, verified structural beam computations with rich interactive diagrams
-              and transparent mathematical proofs.
+              Define your beam, apply a point load and a distributed load, and explore the results
+              with interactive diagrams.
             </p>
             <div className="landing-cta-actions">
               <button
@@ -436,13 +415,12 @@ export const LandingPage: FC<LandingPageProps> = ({
         </div>
       </section>
 
+      </main>
       {/* ── Footer ───────────────────────────────────────────── */}
       <footer className="landing-footer">
         <div className="landing-container landing-footer__inner">
           <div className="landing-footer__brand">
-            <div className="landing-footer__title">
-              BEAM <span>CALCI</span>
-            </div>
+            <Logo theme={theme} height={28} />
             <p className="landing-footer__tag">
               Euler-Bernoulli Finite Element Structural Analysis Platform.
             </p>
@@ -457,7 +435,7 @@ export const LandingPage: FC<LandingPageProps> = ({
           </div>
 
           <div className="landing-footer__legal">
-            <span>Beam Calci v1.0 • Built with Three.js, React & TypeScript</span>
+            <span>Beam Calci · Structural beam analysis</span>
             <span>Intended for structural design checks and educational analysis.</span>
           </div>
         </div>
