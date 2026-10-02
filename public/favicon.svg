@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Beam body -->
+  <rect x="2" y="13" width="28" height="6" rx="1" fill="#1E3A5F"/>
+  <!-- Left pin support -->
+  <polygon points="7,19 4,25 10,25" fill="#059669"/>
+  <line x1="2" y1="26" x2="12" y2="26" stroke="#059669" stroke-width="2" stroke-linecap="round"/>
+  <!-- Right roller support -->
+  <polygon points="25,19 22,25 28,25" fill="#059669"/>
+  <circle cx="25" cy="27" r="1.5" fill="#059669"/>
+  <!-- Point load arrow -->
+  <line x1="16" y1="5" x2="16" y2="12" stroke="#DC2626" stroke-width="2" stroke-linecap="round"/>
+  <polygon points="16,13 13.5,8 18.5,8" fill="#DC2626"/>
+</svg>
