@@ -1,8 +1,8 @@
-# Beam Calci
+# Beam Calculator
 
 A professional, deployable structural beam analysis web application.
 
-![Beam Calci](./public/favicon.svg)
+![Beam Calculator](./public/favicon.svg)
 
 ## Features
 

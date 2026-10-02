@@ -1,5 +1,5 @@
 // ============================================================
-// Beam Calci — Finite Element Analysis Solver
+// Beam Calculator — Finite Element Analysis Solver
 //
 // Method : Euler-Bernoulli beam finite elements (Hermitian shape functions)
 // Elements: 100 elements of equal length (configurable via N_ELEM)

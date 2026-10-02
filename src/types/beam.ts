@@ -1,5 +1,5 @@
 // ============================================================
-// Beam Calci — Type Definitions
+// Beam Calculator — Type Definitions
 // ============================================================
 
 /** Support conditions at each end of the beam */

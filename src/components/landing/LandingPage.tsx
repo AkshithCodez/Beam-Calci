@@ -435,7 +435,7 @@ export const LandingPage: FC<LandingPageProps> = ({
           </div>
 
           <div className="landing-footer__legal">
-            <span>Beam Calci · Structural beam analysis</span>
+            <span>Beam Calculator · Structural beam analysis</span>
             <span>Intended for structural design checks and educational analysis.</span>
           </div>
         </div>

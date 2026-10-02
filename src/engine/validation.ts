@@ -1,5 +1,5 @@
 // ============================================================
-// Beam Calci — Input Validation
+// Beam Calculator — Input Validation
 // ============================================================
 
 import type { InputFields, FieldErrors, BeamInput } from '../types/beam';

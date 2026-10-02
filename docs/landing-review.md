@@ -11,7 +11,7 @@ Initial mismatch checklist:
 - Path does not lead from lower left toward portal; use diagonal pier and figure for scale.
 - Clouds blurred blobs; create irregular shaded banks at multiple depths.
 - Long copy crowds scene; light two-line heading and short description at left.
-- Logo illegible; golden B and HTML Beam Calci wordmark.
+- Logo illegible; golden B and HTML Beam Calculator wordmark.
 
 Keep calculation engine and form state. Reference is dusk despite being designated light mode: preserve that hero art direction, with ivory calculator and content surfaces. Dark mode uses navy sky/stone/water and amber light.
 
