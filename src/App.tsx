@@ -8,8 +8,10 @@ import Header from './components/Header';
 import InputPanel from './components/InputPanel';
 import BeamDiagram from './components/BeamDiagram';
 import ResultsPanel from './components/ResultsPanel';
+import LandingPage from './components/landing/LandingPage';
 
 type Theme = 'light' | 'dark';
+type ViewMode = 'landing' | 'calculator';
 
 // ── Example configuration (clearly labelled) ─────────────────
 // Simply-supported beam, 6m span, 10kN central point load, E=200GPa, 200×400mm section
@@ -34,12 +36,36 @@ function App() {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
+  const [view, setView] = useState<ViewMode>(() => {
+    return window.location.hash === '#calculator' ? 'calculator' : 'landing';
+  });
+
   const [fields, setFields] = useState<InputFields>(DEFAULT_FIELDS);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [analysis, setAnalysis] = useState<BeamAnalysis | null>(null);
   const [solvedInput, setSolvedInput] = useState<BeamInput | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [hasCalculated, setHasCalculated] = useState(false);
+
+  // Sync hash changes
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash === '#calculator') {
+        setView('calculator');
+      } else if (
+        window.location.hash === '#home' ||
+        window.location.hash === '' ||
+        window.location.hash === '#overview' ||
+        window.location.hash === '#features' ||
+        window.location.hash === '#workflow' ||
+        window.location.hash === '#theory'
+      ) {
+        setView('landing');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Persist theme
   useEffect(() => {
@@ -51,9 +77,20 @@ function App() {
     setTheme(t => (t === 'light' ? 'dark' : 'light'));
   }, []);
 
+  const handleOpenCalculator = useCallback(() => {
+    setView('calculator');
+    window.location.hash = '#calculator';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const handleNavigateHome = useCallback(() => {
+    setView('landing');
+    window.location.hash = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   const handleFieldChange = useCallback((key: keyof InputFields, value: string) => {
     setFields(prev => ({ ...prev, [key]: value }));
-    // Clear error for the field being edited
     setErrors(prev => {
       const next = { ...prev };
       delete next[key];
@@ -71,14 +108,13 @@ function App() {
     });
   }, []);
 
-  const handleCalculate = useCallback(() => {
-    const { errors: validationErrors, input } = validateInputs(fields);
+  const handleCalculateWithFields = useCallback((inputFields: InputFields) => {
+    const { errors: validationErrors, input } = validateInputs(inputFields);
     setErrors(validationErrors);
 
     if (!input) return;
 
     setIsCalculating(true);
-    // Use setTimeout to allow React to re-render the "Calculating…" state
     setTimeout(() => {
       const result = solveBeam(input);
       setAnalysis(result);
@@ -86,7 +122,11 @@ function App() {
       setHasCalculated(true);
       setIsCalculating(false);
     }, 50);
-  }, [fields]);
+  }, []);
+
+  const handleCalculate = useCallback(() => {
+    handleCalculateWithFields(fields);
+  }, [fields, handleCalculateWithFields]);
 
   const handleReset = useCallback(() => {
     setFields(DEFAULT_FIELDS);
@@ -104,12 +144,36 @@ function App() {
     setHasCalculated(false);
   }, []);
 
+  const handleLoadExampleAndCalculate = useCallback(() => {
+    setFields(EXAMPLE_FIELDS);
+    setErrors({});
+    setView('calculator');
+    window.location.hash = '#calculator';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    handleCalculateWithFields(EXAMPLE_FIELDS);
+  }, [handleCalculateWithFields]);
+
   // Build a live preview input (for beam diagram — shows current form state)
   const { input: liveInput } = validateInputs(fields);
 
+  if (view === 'landing') {
+    return (
+      <LandingPage
+        onOpenCalculator={handleOpenCalculator}
+        onLoadExampleAndCalculate={handleLoadExampleAndCalculate}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
+      />
+    );
+  }
+
   return (
     <div className="app" data-theme={theme}>
-      <Header theme={theme} onToggleTheme={handleToggleTheme} />
+      <Header
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
+        onNavigateHome={handleNavigateHome}
+      />
 
       <main className="workspace" id="main-content">
         {/* ── Left column: inputs ── */}

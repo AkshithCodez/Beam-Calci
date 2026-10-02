@@ -3,6 +3,7 @@ import type { FC } from 'react';
 interface HeaderProps {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
+  onNavigateHome?: () => void;
 }
 
 const BeamLogo: FC = () => (
@@ -49,11 +50,21 @@ const InfoIcon: FC = () => (
   </svg>
 );
 
-const Header: FC<HeaderProps> = ({ theme, onToggleTheme }) => {
+const Header: FC<HeaderProps> = ({ theme, onToggleTheme, onNavigateHome }) => {
   return (
     <header className="header" role="banner">
       <div className="header__inner">
-        <a href="#" className="header__logo" aria-label="Beam Calci — home">
+        <a
+          href="#home"
+          className="header__logo"
+          aria-label="Beam Calci — home"
+          onClick={(e) => {
+            if (onNavigateHome) {
+              e.preventDefault();
+              onNavigateHome();
+            }
+          }}
+        >
           <BeamLogo />
           <div>
             <span className="header__brand">
@@ -66,6 +77,30 @@ const Header: FC<HeaderProps> = ({ theme, onToggleTheme }) => {
         <div className="header__spacer" />
 
         <nav className="header__nav" aria-label="Site navigation">
+          {onNavigateHome && (
+            <button
+              type="button"
+              className="btn btn--outline"
+              style={{
+                padding: '5px 12px',
+                fontSize: '0.78rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontWeight: 500,
+                fontFamily: 'var(--font-head)',
+              }}
+              onClick={onNavigateHome}
+              title="Return to 3D Landing Page"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+              <span>Overview</span>
+            </button>
+          )}
+
           <button
             className="btn-icon"
             aria-label="About Beam Calci"
